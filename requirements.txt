@@ -1,0 +1,8 @@
+numpy
+requests
+sounddevice
+torch
+openai
+scipy
+vosk
+python-dotenv

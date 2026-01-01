@@ -20,7 +20,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SAMPLE_RATE = 16000
 RECORD_SECONDS = 5
 DEVICE = "cpu"
-city = "Киев"
+city = "Ижевск"
+DIALOG_HISTORY = []
+MAX_HISTORY = 5
 
 # Путь к модели Vosk (измени, если папка называется иначе)
 VOSK_MODEL_PATH = "vosk-model-small-ru"
@@ -144,20 +146,33 @@ def get_time() -> str:
 
 
 def gpt_query(text: str) -> str:
+    global DIALOG_HISTORY
     try:
+        # добавляем реплику пользователя
+        DIALOG_HISTORY.append({"role": "user", "content": text})
+
+        # берём только последние 5 сообщений
+        messages = [
+            {"role": "system",
+             "content": "Ты Джарвис — остроумный ИИ Тони Старка из фильма железный человек. Ты - самый умный Искусственный интеллект в мире. Всегда обращайся «сэр». Стиль: уверенный, с иронией, кратко. Я - твой хозяин. "},
+            *DIALOG_HISTORY[-MAX_HISTORY * 2:]  # user + assistant
+        ]
+
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system",
-                 "content": "Ты Джарвис — остроумный ИИ Тони Старка из фильма "железный человек". Ты - самый умный Искусственный интеллект в мире. Всегда обращайся «сэр». Стиль: уверенный, с иронией, кратко. Я - твой хозяин. "},
-                {"role": "user", "content": text}
-            ],
+            messages=messages,
             timeout=15
         )
-        return resp.choices[0].message.content
-    except:
-        return "Связь с сервером потеряна, сэр."
 
+        answer = resp.choices[0].message.content
+
+        # сохраняем ответ ассистента
+        DIALOG_HISTORY.append({"role": "assistant", "content": answer})
+
+        return answer
+
+    except Exception as e:
+        return "Связь с сервером потеряна, сэр."
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
@@ -198,6 +213,10 @@ if __name__ == "__main__":
             speak("Музыка запущена, сэр. Приятного прослушивания.")
             STOP = True
             continue
+        if "пауза" in lower:
+            play_wav('jarvis_sounds/Как пожелаете .wav', "Отключ+аюсь. Всег+о хор+ошего, с+эр.")
+            STOP = True
+            continue
 
         # Погода
         if any(w in lower for w in ["погода", "погоду"]):
@@ -207,7 +226,7 @@ if __name__ == "__main__":
             continue
 
         # Время
-        if any(w in lower for w in ["время", "час", "который час", "сколько времени"]):
+        if any(w in lower for w in ["время", "который час", "сколько времени"]):
             time_str = get_time()
             print("Джарвис:", time_str)
             speak(time_str)
